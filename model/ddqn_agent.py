@@ -17,7 +17,7 @@ class DDQN_agent:
         self.exploration_rate = exploration_rate
         self.replacement_frequency = replacement_frequency
         self.learning_rate = learning_rate
-        self.resfcn = ResFCN
+        self.resfcn = ResFCN(observation_space.shape[0])
 
         # Initialize the Behavior Network and the Target Network
         self.model = DQN("MlpPolicy", (32,), action_space, verbose=1,
@@ -36,7 +36,7 @@ class DDQN_agent:
             return np.argmax(action_probs[0])
 
     def store_transition(self, state, action, reward, next_state, done):
-        self.replay_buffer.store((state, action, reward, next_state, done))
+        self.replay_buffer.add(state, action, reward, next_state, done)
 
     def sample_batch(self):
         minibatch = self.replay_buffer.sample(self.batch_size)
