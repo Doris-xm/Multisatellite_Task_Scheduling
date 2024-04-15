@@ -17,10 +17,9 @@ class DDQN_agent:
         self.exploration_rate = exploration_rate
         self.replacement_frequency = replacement_frequency
         self.learning_rate = learning_rate
-        self.resfcn = ResFCN  # Add ResFCN to the DDQN_agent
+        self.resfcn = ResFCN
 
         # Initialize the Behavior Network and the Target Network
-        # Note: The input shape for the DQN policy should match the output shape of the ResFCN
         self.model = DQN("MlpPolicy", (32,), action_space, verbose=1,
                          learning_rate=learning_rate, buffer_size=10000, gamma=gamma)
         self.target_model = DQN("MlpPolicy", (32,), action_space, verbose=0,
@@ -29,7 +28,6 @@ class DDQN_agent:
         self.replay_buffer = ReplayBuffer(self.model.replay_buffer_size)
 
     def select_action(self, state):
-        # Use ResFCN to process the state and then select an action based on the processed state
         processed_state = self.resfcn(state)
         if np.random.random() < self.exploration_rate:
             return np.random.randint(self.action_space.n)
@@ -66,7 +64,7 @@ class DDQN_agent:
 
             minibatch = self.sample_batch()
             states, actions, rewards, next_states, dones = minibatch
-            target_outputs = self.compute_target(minibatch)
+            target_outputs = self.compute_target(minibatch)    # TODO:not used
             self.model.learn(states, actions, rewards, next_states, dones)
 
             if iteration % self.replacement_frequency == 0:
