@@ -5,17 +5,17 @@ from simulator.ResourceSatellite import ResourceSatellite
 
 
 class SatelliteTaskSchedulingEnv(gym.Env):
-    def __init__(self, task_satellites, resource_satellites, tasks, stop_time=1000):
+    def __init__(self, task_satellites=None, resource_satellites=None, tasks=None, stop_time=1000):
 
         self.global_time = 0
         self.stop_time = stop_time
         self.min_E = 40
 
-        self.task_satellites = task_satellites
+        self.task_satellites = task_satellites  # 暂时没有用到task_satellites,直接输入tasks
         self.resources_num = 20
-        self.resources = ResourceSatellite(num=self.resources_num, resource_satellites=resource_satellites)
+        self.resources = resource_satellites
         self.tasks = tasks
-        self.max_beam = max([res['beam'] for res in resource_satellites])
+        self.max_beam = max([len(res) for res in self.resources.resource_satellites])
         # 定义状态和动作空间
         # actions: [0, max_num_of(resource_satellites)] 表示选择第i个资源卫星, 一次选择一个
         self.action_space = gym.spaces.Discrete(self.resources_num)
@@ -51,12 +51,9 @@ class SatelliteTaskSchedulingEnv(gym.Env):
 
         return self.observation, self.reward, done, {}
 
-
-
-    def reset(self):
-        self.global_time = 0
-        return self.get_observation()
-
+    # def reset(self):
+    #     self.global_time = 0
+    #     return self.observation
     def render(self, mode='human'):
         pass
 
