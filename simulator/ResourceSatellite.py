@@ -1,14 +1,15 @@
 class ResourceSatellite:
     def __init__(self, num, beam=4, time=0, E=100, E_min=40, resource_satellites=None):
-        if resource_satellites is None:
-            self.resource_satellites = self.create_resource_satellites()
-        else:
-            self.resource_satellites = resource_satellites
         self.num = num
         self.beam = beam
         self.time = time
         self.E = E
         self.E_min = E_min
+
+        if resource_satellites is None:
+            self.resource_satellites = self.create_resource_satellites()
+        else:
+            self.resource_satellites = resource_satellites
 
     def create_resource_satellites(self):
         satellites = []
