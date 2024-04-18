@@ -38,35 +38,57 @@ class DDQN_agent:
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
 
-            with torch.no_grad():
-                # Compute the next Q-values using the target network
-                next_q_values = self.model.q_net_target(replay_data.next_observations)
-                # Follow greedy policy: use the one with the highest value
-                next_q_values, _ = next_q_values.max(dim=1)
-                # Avoid potential broadcast issue
-                next_q_values = next_q_values.reshape(-1, 1)
-                # 1-step TD target
-                target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
+            # Check Receding Horizon Condition (公式22)
+            if self.receding_horizon_condition():
+                self.execute_receding_horizon_optimization()
 
-            # Get current Q-values estimates
-            current_q_values = self.model.q_net(replay_data.observations)
+            # Check Event-Triggered Condition (公式23)
+            elif self.event_triggered_condition():
+                self.execute_event_triggered_optimization()
 
-            # Retrieve the q-values for the actions from the replay buffer
-            current_q_values = torch.gather(current_q_values, dim=1, index=replay_data.actions.long())
-
-            # Compute Huber loss (less sensitive to outliers)
-            loss = F.smooth_l1_loss(current_q_values, target_q_values)
-            losses.append(loss.item())
-
-            # Optimize the policy
-            self.model.policy.optimizer.zero_grad()
-            loss.backward()
-            # Clip gradient norm
-            torch.nn.utils.clip_grad_norm_(self.model.policy.parameters(), self.model.max_grad_norm)
-            self.model.policy.optimizer.step()
+            # Otherwise, continue with Algorithm 1
+            else:
+                with torch.no_grad():
+                    # Compute the next Q-values using the target network
+                    next_q_values = self.model.q_net_target(replay_data.next_observations)
+                    # Follow greedy policy: use the one with the highest value
+                    next_q_values, _ = next_q_values.max(dim=1)
+                    # Avoid potential broadcast issue
+                    next_q_values = next_q_values.reshape(-1, 1)
+                    # 1-step TD target
+                    target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
+    
+                # Get current Q-values estimates
+                current_q_values = self.model.q_net(replay_data.observations)
+    
+                # Retrieve the q-values for the actions from the replay buffer
+                current_q_values = torch.gather(current_q_values, dim=1, index=replay_data.actions.long())
+    
+                # Compute Huber loss (less sensitive to outliers)
+                loss = F.smooth_l1_loss(current_q_values, target_q_values)
+                losses.append(loss.item())
+    
+                # Optimize the policy
+                self.model.policy.optimizer.zero_grad()
+                loss.backward()
+                # Clip gradient norm
+                torch.nn.utils.clip_grad_norm_(self.model.policy.parameters(), self.model.max_grad_norm)
+                self.model.policy.optimizer.step()
 
         # Increase update counter
         self.model._n_updates += gradient_steps
 
         self.model.logger.record("train/n_updates", self.model._n_updates, exclude="tensorboard")
         self.model.logger.record("train/loss", np.mean(losses))
+
+    def receding_horizon_condition(self):
+        pass
+
+    def execute_receding_horizon_optimization(self):
+        pass
+
+    def event_triggered_condition(self):
+        pass
+
+    def execute_event_triggered_optimization(self):
+        pass
