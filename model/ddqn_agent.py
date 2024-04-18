@@ -9,8 +9,8 @@ from model.res_fcn import ResFCN
 
 
 class DDQN_agent:
-    def __init__(self, observation_space, action_space, batch_size=64, gamma=0.99,
-                 exploration_rate=1.0, replacement_frequency=15, learning_rate=1e-4):
+    def __init__(self, sim, observation_space, action_space, batch_size=64, gamma=0.99,
+                 exploration_rate=1.0, replacement_frequency=15, learning_rate=1e-4, window_size=20):
         self.observation_space = observation_space
         self.action_space = action_space
         self.batch_size = batch_size
@@ -21,6 +21,8 @@ class DDQN_agent:
         self.resfcn = ResFCN(observation_space.shape[0])
         env = gym.make('CartPole-v1')
         self.env = DummyVecEnv([lambda: env])
+        self.sim = sim
+        self.window_size = window_size
 
         # Initialize the Behavior Network and the Target Network
         self.model = DQN("MlpPolicy", (32,), action_space, verbose=1,
@@ -36,7 +38,7 @@ class DDQN_agent:
         for _ in range(gradient_steps):
 
             # Sample replay buffer
-            replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
+            replay_data = self.model.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
 
             # Check Receding Horizon Condition (公式22)
             if self.receding_horizon_condition():
@@ -82,7 +84,7 @@ class DDQN_agent:
         self.model.logger.record("train/loss", np.mean(losses))
 
     def receding_horizon_condition(self):
-        pass
+        return self.sim.current_time - self.sim.last_scheduling_time >= self.window_size
 
     def execute_receding_horizon_optimization(self):
         pass

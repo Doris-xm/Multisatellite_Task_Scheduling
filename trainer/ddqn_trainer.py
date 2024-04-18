@@ -1,5 +1,5 @@
 from model.ddqn_agent import DDQN_agent
-from simulator.satellite_sim import SatelliteSim
+from simulator.Env import SatelliteSim
 
 
 class DDQNTrainer:
