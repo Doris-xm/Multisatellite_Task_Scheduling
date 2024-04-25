@@ -1,63 +1,139 @@
+from random import random
+from typing import Tuple, Dict, Any
+
 import gymnasium as gym
 import numpy as np
+from gymnasium.core import ObsType
 
-from simulator.ResourceSatellite import ResourceSatellite
+from config.default import Config
+from simulator.Task import create_tasks
 
 
 class SatelliteTaskSchedulingEnv(gym.Env):
-    def __init__(self, task_satellites=None, resource_satellites=None, tasks=None, stop_time=1000):
+    def __init__(self, config: Config = None):
+        if config is None:
+            config = Config()
+        self.config = config
 
-        self.global_time = 0
-        self.stop_time = stop_time
-        self.min_E = 40
+        self.horizon_start = 0
+        self.stop_time = self.config.TOTAL_TIME
+        self.d_grids = self.config.D_GRIDS
 
-        self.task_satellites = task_satellites  # 暂时没有用到task_satellites,直接输入tasks
-        self.resources_num = 20
-        self.resources = resource_satellites
-        self.tasks = tasks
-        self.max_beam = max([len(res) for res in self.resources.resource_satellites])
+        self.ts_num = self.config.TS_NUM  # number of task satellites
+        self.beam_num = self.config.BEAM_NUM
+        self.rs_num = self.config.RS_NUM  # number of resource satellites
+        self.rs_list = []
+        self.tasks = []
+        # self.rs_list = self.create_resource_satellites()
+        # self.tasks = create_tasks(self.ts_num, self.config.MAX_PRIORITY, self.config.MAX_TASK_TIME,
+        #                           self.config.MAX_TASK_E, self.stop_time)
+        self.min_E = self.config.E_MIN
+
         # 定义状态和动作空间
         # actions: [0, max_num_of(resource_satellites)] 表示选择第i个资源卫星, 一次选择一个
-        self.action_space = gym.spaces.Discrete(self.resources_num)
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.resources_num,
-                                                                                 self.max_beam), dtype=np.float32)  # 假设状态是一个n_observations维的向量
-        self.reward = 0
-        self.observation = np.zeros((self.resources_num, self.max_beam))
+        self.action_space = gym.spaces.Discrete(self.rs_num + 1)
+        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(self.rs_num, self.beam_num, self.d_grids),
+                                                dtype=np.float32)
+
+        self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
+        self.cur_task = 0
 
     def step(self, action):
-        # 将动作限制在有效范围内
-        action = np.clip(action, 1, len(self.resources.resource_satellites))
+        success = False
+        task = self.tasks[self.cur_task]
+        self.cur_task += 1
+        if_switch = False
+        if 0 < action <= self.rs_num:   # 如果action合法
+            for i in range(self.beam_num):     # 遍历beam
+                # 检查是否有足够的能量
+                if self.rs_list[action - 1][i]['E_left'] - task.energy < self.min_E:
+                    continue
 
-        self.global_time += 1
+                # 检查是否有足够的时间窗口, 遍历可执行的时间窗口
+                for j in range(task.start_time - self.horizon_start, task.end_time - task.duration + 1 - self.horizon_start):
+                    if self.state[action - 1][i][j] == 0:
+                        success = True
+                        #   更新状态
+                        self.state[action - 1][i][j:j + task.duration] = 1
+                        self.rs_list[action - 1][i]['E_left'] -= task.energy
 
-        #检查约束
-        beam = self.resources.schedule_task(self.tasks[0], action)
-        if beam == -1:
-            return self.observation, -1, False, {}
+                        #  和上一次任务比较，是否需要切换task satellite
+                        if self.rs_list[action - 1][i]['last_ts'] >= 0 and self.rs_list[action - 1][i]['last_ts'] != task.ts_id:
+                            if_switch = True
+                        self.rs_list[action - 1][i]['last_ts'] = task.ts_id
+                        break
 
-        # 更新状态
-        self.observation[action][beam] += self.tasks[0].time
+                # # 如果不是按照开始时间依次调度，需要设置滑动窗口，检查是否有连续的时间窗口
+                # for j in range(task.start_time, task.end_time - task.duration + 1):
+                #     window = self.state[action - 1][i][j: j + task.duration]
+                #     if all(value == 0 for value in window):
+                #         return j  # 返回第一个可执行时间点
 
-        priority = self.tasks[0].priority
-        success_num = 1
-        beam_switch_num = 1  # what's the difference between success_num and beam_switch_num?
-        self.reward += 1.2 * priority + 2 * success_num - beam_switch_num
-
-        self.tasks.pop(0)
-
-
+        reward = -1
+        if success:
+            # 更新reward
+            reward = task.priority + 1 - if_switch
         # 判断是否终止
-        done = self.global_time >= self.stop_time or len(self.tasks) == 0
+        done = self.cur_task >= len(self.tasks)
+        if done:
+            return self.state, reward, done, {}
 
-        return self.observation, self.reward, done, {}
+        # 检查是否需要滑动horizon
+        if self.tasks[self.cur_task].start_time - self.horizon_start >= self.d_grids:
+            self.move_horizon(self.d_grids)
+        if self.horizon_start >= self.stop_time:
+            done = True
+            return self.state, reward, done, {}
 
-    # def reset(self):
-    #     self.global_time = 0
-    #     return self.observation
+        # 根据下一个task计算下一个state
+        next_state = self.get_next_state()
+        info = {'state': next_state}
+        return self.state, reward, done, info
+
+
+    def reset(self) -> Tuple[ObsType, Dict[str, Any]]:
+        self.horizon_start = 0
+        self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
+        self.cur_task = 0
+        self.rs_list = self.create_resource_satellites()
+        self.tasks = create_tasks(self.ts_num, self.config.MAX_PRIORITY, self.config.MAX_TASK_TIME,
+                                  self.config.MAX_TASK_E, self.stop_time)
+        next_state = self.get_next_state()
+        info = {'state': next_state}
+        return self.state, info
+
+    def create_resource_satellites(self):
+        satellites = []
+        for i in range(self.config.RS_NUM):
+            satellite = []
+            for i in range(self.config.BEAM_NUM):
+                if self.config.ENERGY_POLICY == 'full':
+                    satellite.append({'E_left': self.config.INIT_ENERGY,
+                                      'E_min': self.config.E_MIN,
+                                      'last_tx': -1})
+                else:  # random
+                    satellite.append(
+                        {'E_left': random() % (self.config.INIT_ENERGY - self.config.E_MIN) + self.config.E_MIN,
+                         'E_min': self.config.E_MIN,
+                         'last_tx': -1})
+            satellites.append(satellite)
+        return satellites
+
     def render(self, mode='human'):
         pass
 
     def close(self):
         pass
 
+    def move_horizon(self, len):
+        self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
+        self.horizon_start += len
 
+    def get_next_state(self):
+        next_state = self.state.copy()
+        task = self.tasks[self.cur_task]
+        for i in range(self.rs_num):
+            for j in range(self.beam_num):
+                next_state[i][j][0:task.start_time] = 1
+                next_state[i][j][task.end_time:] = 1
+        return next_state
