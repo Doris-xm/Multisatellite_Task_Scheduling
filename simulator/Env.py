@@ -87,9 +87,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
 
         # 根据下一个task计算下一个state
         next_state = self.get_next_state()
-        info = {'state': next_state}
-        return self.state, reward, done, info
-
+        return next_state, reward, done, {}
 
     def reset(self) -> Tuple[ObsType, Dict[str, Any]]:
         self.horizon_start = 0
@@ -99,8 +97,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         self.tasks = create_tasks(self.ts_num, self.config.MAX_PRIORITY, self.config.MAX_TASK_TIME,
                                   self.config.MAX_TASK_E, self.stop_time)
         next_state = self.get_next_state()
-        info = {'state': next_state}
-        return self.state, info
+        return next_state, {}
 
     def create_resource_satellites(self):
         satellites = []
