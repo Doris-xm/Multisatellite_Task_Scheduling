@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from random import random
 from typing import Tuple, Dict, Any
 
@@ -12,7 +14,7 @@ from simulator.Task import create_tasks
 class SatelliteTaskSchedulingEnv(gym.Env):
     def __init__(self, config: Config = None):
         if config is None:
-            config = Config()
+            config = Config
         self.config = config
 
         self.horizon_start = 0
@@ -50,7 +52,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
                     continue
 
                 # 检查是否有足够的时间窗口, 遍历可执行的时间窗口
-                for j in range(task.start_time - self.horizon_start, task.end_time - task.duration + 1 - self.horizon_start):
+                for j in range(task.start_time - self.horizon_start, min(self.d_grids, task.end_time - task.duration + 1 - self.horizon_start)):
                     if self.state[action - 1][i][j] == 0:
                         success = True
                         #   更新状态
@@ -76,20 +78,25 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         # 判断是否终止
         done = self.cur_task >= len(self.tasks)
         if done:
-            return self.state, reward, done, {}
+            return self.state, reward, done, False, {}
 
         # 检查是否需要滑动horizon
-        if self.tasks[self.cur_task].start_time - self.horizon_start >= self.d_grids:
+        if self.tasks[self.cur_task].start_time - self.horizon_start +  self.tasks[self.cur_task].duration >= self.d_grids:
             self.move_horizon(self.d_grids)
         if self.horizon_start >= self.stop_time:
             done = True
-            return self.state, reward, done, {}
+            return self.state, reward, done, True, {}
 
         # 根据下一个task计算下一个state
         next_state = self.get_next_state()
-        return next_state, reward, done, {}
+        return next_state, reward, done, False, {}
 
-    def reset(self) -> Tuple[ObsType, Dict[str, Any]]:
+    def reset(
+            self,
+            *,
+            seed: int | None = None,
+            options: dict[str, Any] | None = None,
+    ) -> tuple[ObsType, dict[str, Any]]:
         self.horizon_start = 0
         self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
         self.cur_task = 0
@@ -107,12 +114,12 @@ class SatelliteTaskSchedulingEnv(gym.Env):
                 if self.config.ENERGY_POLICY == 'full':
                     satellite.append({'E_left': self.config.INIT_ENERGY,
                                       'E_min': self.config.E_MIN,
-                                      'last_tx': -1})
+                                      'last_ts': -1})
                 else:  # random
                     satellite.append(
                         {'E_left': random() % (self.config.INIT_ENERGY - self.config.E_MIN) + self.config.E_MIN,
                          'E_min': self.config.E_MIN,
-                         'last_tx': -1})
+                         'last_ts': -1})
             satellites.append(satellite)
         return satellites
 
