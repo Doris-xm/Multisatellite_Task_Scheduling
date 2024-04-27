@@ -45,14 +45,15 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         task = self.tasks[self.cur_task]
         self.cur_task += 1
         if_switch = False
-        if 0 < action <= self.rs_num:   # 如果action合法
-            for i in range(self.beam_num):     # 遍历beam
+        if 0 < action <= self.rs_num:  # 如果action合法
+            for i in range(self.beam_num):  # 遍历beam
                 # 检查是否有足够的能量
                 if self.rs_list[action - 1][i]['E_left'] - task.energy < self.min_E:
                     continue
 
                 # 检查是否有足够的时间窗口, 遍历可执行的时间窗口
-                for j in range(task.start_time - self.horizon_start, min(self.d_grids, task.end_time - task.duration + 1 - self.horizon_start)):
+                for j in range(task.start_time - self.horizon_start, min(self.d_grids - task.duration,
+                                                                         task.end_time - self.horizon_start - task.duration + 1)):
                     if self.state[action - 1][i][j] == 0:
                         success = True
                         #   更新状态
@@ -60,10 +61,13 @@ class SatelliteTaskSchedulingEnv(gym.Env):
                         self.rs_list[action - 1][i]['E_left'] -= task.energy
 
                         #  和上一次任务比较，是否需要切换task satellite
-                        if self.rs_list[action - 1][i]['last_ts'] >= 0 and self.rs_list[action - 1][i]['last_ts'] != task.ts_id:
+                        if self.rs_list[action - 1][i]['last_ts'] >= 0 and self.rs_list[action - 1][i][
+                            'last_ts'] != task.ts_id:
                             if_switch = True
                         self.rs_list[action - 1][i]['last_ts'] = task.ts_id
                         break
+                if success:
+                    break
 
                 # # 如果不是按照开始时间依次调度，需要设置滑动窗口，检查是否有连续的时间窗口
                 # for j in range(task.start_time, task.end_time - task.duration + 1):
@@ -75,16 +79,13 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         if success:
             # 更新reward
             reward = task.priority + 1 - if_switch
-        # 判断是否终止
-        done = self.cur_task >= len(self.tasks)
-        if done:
-            return self.state, reward, done, False, {}
 
-        # 检查是否需要滑动horizon
+        # 检查是否需要滑动horizon: 这个判断基于 task按照start_time排序
         if self.tasks[self.cur_task].start_time - self.horizon_start +  self.tasks[self.cur_task].duration >= self.d_grids:
             self.move_horizon(self.d_grids)
-        if self.horizon_start >= self.stop_time:
-            done = True
+        # 判断是否终止
+        done = self.horizon_start >= self.stop_time
+        if done:
             return self.state, reward, done, True, {}
 
         # 根据下一个task计算下一个state
@@ -138,6 +139,8 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         task = self.tasks[self.cur_task]
         for i in range(self.rs_num):
             for j in range(self.beam_num):
-                next_state[i][j][0:task.start_time] = 1
-                next_state[i][j][task.end_time:] = 1
+                # 将不可能的时间段设为1
+                next_state[i][j][0:task.start_time-self.horizon_start] = 1
+                next_state[i][j][task.end_time-self.horizon_start:] = 1
+        # next_state 是当前task所有可能执行的时间段
         return next_state
