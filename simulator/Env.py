@@ -25,6 +25,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         self.beam_num = self.config.BEAM_NUM
         self.rs_num = self.config.RS_NUM  # number of resource satellites
         self.rs_list = []
+        self.ts_list = []
         self.tasks = []
         # self.rs_list = self.create_resource_satellites()
         # self.tasks = create_tasks(self.ts_num, self.config.MAX_PRIORITY, self.config.MAX_TASK_TIME,
@@ -46,25 +47,29 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         self.cur_task += 1
         if_switch = False
         if 0 < action <= self.rs_num:  # 如果action合法
-            for i in range(self.beam_num):  # 遍历beam
+            for beam in range(self.beam_num):  # 遍历beam
                 # 检查是否有足够的能量
-                if self.rs_list[action - 1][i]['E_left'] - task.energy < self.min_E:
+                if self.rs_list[action - 1][beam]['E_left'] - task.energy < self.min_E:
                     continue
 
                 # 检查是否有足够的时间窗口, 遍历可执行的时间窗口
+                # j 表示每个时间grid
                 for j in range(task.start_time - self.horizon_start, min(self.d_grids - task.duration,
                                                                          task.end_time - self.horizon_start - task.duration + 1)):
-                    if self.state[action - 1][i][j] == 0:
+                    if self.state[action - 1][beam][j] == 0:
                         success = True
                         #   更新状态
-                        self.state[action - 1][i][j:j + task.duration] = 1
-                        self.rs_list[action - 1][i]['E_left'] -= task.energy
+                        self.state[action - 1][beam][j:j + task.duration] = 1
+                        self.rs_list[action - 1][beam]['E_left'] -= task.energy
 
                         #  和上一次任务比较，是否需要切换task satellite
-                        if self.rs_list[action - 1][i]['last_ts'] >= 0 and self.rs_list[action - 1][i][
-                            'last_ts'] != task.ts_id:
-                            if_switch = True
-                        self.rs_list[action - 1][i]['last_ts'] = task.ts_id
+                        #  在task satellite这端计算switch次数
+                        if self.ts_list[task.ts_id]['last_task_rs'] > 0:
+                            if self.ts_list[task.ts_id]['last_task_rs'] != action - 1 and self.ts_list[task.ts_id]['last_task_beam'] != beam:
+                                if_switch = True
+
+                        self.ts_list[task.ts_id]['last_task_rs'] = action - 1
+                        self.ts_list[task.ts_id]['last_task_beam'] = beam
                         break
                 if success:
                     break
@@ -81,7 +86,8 @@ class SatelliteTaskSchedulingEnv(gym.Env):
             reward = task.priority + 1 - if_switch
 
         # 检查是否需要滑动horizon: 这个判断基于 task按照start_time排序
-        if self.tasks[self.cur_task].start_time - self.horizon_start +  self.tasks[self.cur_task].duration >= self.d_grids:
+        if self.tasks[self.cur_task].start_time - self.horizon_start + self.tasks[
+            self.cur_task].duration >= self.d_grids:
             self.move_horizon(self.d_grids)
         # 判断是否终止
         done = self.horizon_start >= self.stop_time
@@ -102,6 +108,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
         self.cur_task = 0
         self.rs_list = self.create_resource_satellites()
+        self.ts_list = self.create_task_satellites()
         self.tasks = create_tasks(self.ts_num, self.config.MAX_PRIORITY, self.config.MAX_TASK_TIME,
                                   self.config.MAX_TASK_E, self.stop_time)
         next_state = self.get_next_state()
@@ -124,6 +131,15 @@ class SatelliteTaskSchedulingEnv(gym.Env):
             satellites.append(satellite)
         return satellites
 
+    def create_task_satellites(self):
+        # 在task satellite这端计算switch次数
+        # task satellite只需要记住上一次task的调度位置
+        satellites = []
+        for i in range(self.config.TS_NUM):
+            satellites.append({'last_task_rs': -1,
+                               'last_task_beam': -1})
+        return satellites
+
     def render(self, mode='human'):
         pass
 
@@ -140,7 +156,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         for i in range(self.rs_num):
             for j in range(self.beam_num):
                 # 将不可能的时间段设为1
-                next_state[i][j][0:task.start_time-self.horizon_start] = 1
-                next_state[i][j][task.end_time-self.horizon_start:] = 1
+                next_state[i][j][0:task.start_time - self.horizon_start] = 1
+                next_state[i][j][task.end_time - self.horizon_start:] = 1
         # next_state 是当前task所有可能执行的时间段
         return next_state
