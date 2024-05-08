@@ -26,7 +26,7 @@ class DDQN_agent:
         self.window_size = window_size
 
         # Initialize the Behavior Network and the Target Network
-        self.model = DQN(policy="MlpPolicy", env=self.env, verbose=1,
+        self.model = DQN(policy="MlpPolicy", env=self.env, verbose=1, tensorboard_log='./log/',
                          learning_rate=learning_rate, buffer_size=10000, gamma=gamma)
 
     def train(self, gradient_steps: int, batch_size: int = 100) -> None:
