@@ -20,9 +20,10 @@ def evaluate_model(model_path):
     obs, info = env.reset()
     while True:
         action, _states = model.predict(obs, deterministic=True)
-        print(action)
+        # print(action)
         obs, reward, terminated, truncated, info = env.step(action)
         if terminated or truncated:
+            env.show_info()
             return
 
 

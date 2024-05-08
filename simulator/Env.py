@@ -12,7 +12,7 @@ from simulator.Task import create_tasks
 
 
 class SatelliteTaskSchedulingEnv(gym.Env):
-    def __init__(self, config: Config = None):
+    def __init__(self, config: Config = None, debug=False):
         if config is None:
             config = Config
         self.config = config
@@ -40,6 +40,10 @@ class SatelliteTaskSchedulingEnv(gym.Env):
 
         self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
         self.cur_task = 0
+
+        # For Debug
+        self.debug_rs_list = []
+        self.debug = debug
 
     def step(self, action):
         success = False
@@ -70,6 +74,9 @@ class SatelliteTaskSchedulingEnv(gym.Env):
 
                         self.ts_list[task.ts_id]['last_task_rs'] = action - 1
                         self.ts_list[task.ts_id]['last_task_beam'] = beam
+
+                        # For Debug
+                        self.debug_rs_list[action - 1][beam].append(task)
                         break
                 if success:
                     break
@@ -84,6 +91,9 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         if success:
             # 更新reward
             reward = task.priority + 1 - if_switch
+        else:  # For Debug
+            if self.debug:
+                print("Task ", task.ts_id, " failed to schedule:", task)
 
         # 检查是否需要滑动horizon: 这个判断基于 task按照start_time排序
         if self.tasks[self.cur_task].start_time - self.horizon_start + self.tasks[
@@ -91,6 +101,8 @@ class SatelliteTaskSchedulingEnv(gym.Env):
             self.move_horizon(self.d_grids)
         # 判断是否终止
         done = self.horizon_start >= self.stop_time
+        if self.cur_task >= len(self.tasks) - 1:  # last task
+            done = True
         if done:
             return self.state, reward, done, True, {}
 
@@ -112,6 +124,13 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         self.tasks = create_tasks(self.ts_num, self.config.MAX_PRIORITY, self.config.MAX_TASK_TIME,
                                   self.config.MAX_TASK_E, self.stop_time)
         next_state = self.get_next_state()
+        # For Debug
+        self.debug_rs_list = []
+        for i in range(self.config.RS_NUM):
+            self.debug_rs_list.append([])
+            for beam in range(self.config.BEAM_NUM):
+                self.debug_rs_list[i].append([])
+
         return next_state, {}
 
     def create_resource_satellites(self):
@@ -160,3 +179,13 @@ class SatelliteTaskSchedulingEnv(gym.Env):
                 next_state[i][j][task.end_time - self.horizon_start:] = 1
         # next_state 是当前task所有可能执行的时间段
         return next_state
+
+    def show_info(self):
+        # For Debug
+        for rs in range(len(self.debug_rs_list)):
+            print("Resource Satellite ", rs)
+            for beam in range(len(self.debug_rs_list[rs])):
+                print("Beam: ", beam)
+                for task in self.debug_rs_list[rs][beam]:
+                    print("[start:", task.start_time, ", end: ", task.end_time, ", duration: ", task.duration, "]")
+        pass
