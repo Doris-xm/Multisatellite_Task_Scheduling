@@ -13,23 +13,9 @@ def train_model(total_timesteps):
     return model
 
 
-def evaluate_model(model_path):
-    model = DQN.load(model_path)
-    env = SatelliteTaskSchedulingEnv()
-
-    obs, info = env.reset()
-    while True:
-        action, _states = model.predict(obs, deterministic=True)
-        # print(action)
-        obs, reward, terminated, truncated, info = env.step(action)
-        if terminated or truncated:
-            env.show_info()
-            return
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate RL model.")
-    parser.add_argument("--total_timesteps", type=int, default=800000, help="Total number of training timesteps")
+    parser.add_argument("--total_timesteps", type=int, default=200000, help="Total number of training timesteps")
     parser.add_argument("--train", action="store_true", help="Train the model")
     parser.add_argument("--model_path", type=str, default="dqn_satellite_task_scheduling",
                         help="Path to save the trained model")
@@ -37,4 +23,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # if args.train:
     train_model(args.total_timesteps)
-    evaluate_model(args.model_path)
+    # evaluate_model(args.model_path)

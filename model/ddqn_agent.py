@@ -5,6 +5,7 @@ import gymnasium as gym
 from stable_baselines3 import DQN
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.env_util import make_vec_env
 from model.res_fcn import ResFCN
 from simulator.Env import SatelliteTaskSchedulingEnv
 
@@ -13,8 +14,10 @@ class DDQN_agent:
     def __init__(self,  batch_size=64, gamma=0.99,
                  exploration_rate=1.0, replacement_frequency=15, learning_rate=1e-4, window_size=20):
 
-        self.env = SatelliteTaskSchedulingEnv()
-        self.env = DummyVecEnv([lambda: self.env])
+        self.env = SatelliteTaskSchedulingEnv() # make-vector-env
+        num_envs = 4
+        self.env = make_vec_env(SatelliteTaskSchedulingEnv, n_envs=num_envs)
+        # self.env = DummyVecEnv([lambda: self.env])
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
         self.batch_size = batch_size
@@ -30,7 +33,7 @@ class DDQN_agent:
                          learning_rate=learning_rate, buffer_size=10000, gamma=gamma)
 
     def train(self, gradient_steps: int, batch_size: int = 100) -> None:
-        self.model.learn(total_timesteps=gradient_steps, log_interval=4)
+        self.model.learn(total_timesteps=gradient_steps, log_interval=4) #callback
         self.model.save("dqn_satellite_task_scheduling")
 
     def receding_horizon_condition(self):

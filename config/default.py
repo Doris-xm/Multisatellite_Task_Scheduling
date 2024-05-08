@@ -7,7 +7,7 @@ class Config:
     INIT_ENERGY = 200
 
     # Task Satellites
-    TS_NUM = 20
+    TS_NUM = 15
 
     # Tasks
     MAX_PRIORITY = 10

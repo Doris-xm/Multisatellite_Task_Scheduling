@@ -35,7 +35,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         # 定义状态和动作空间
         # actions: [0, max_num_of(resource_satellites)] 表示选择第i个资源卫星, 一次选择一个
         self.action_space = gym.spaces.Discrete(self.rs_num + 1)
-        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(self.rs_num, self.beam_num, self.d_grids),
+        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(2, self.rs_num, self.beam_num, self.d_grids),
                                                 dtype=np.float32)
 
         self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
@@ -70,11 +70,11 @@ class SatelliteTaskSchedulingEnv(gym.Env):
                         #  和上一次任务比较，是否需要切换task satellite
                         #  在task satellite这端计算switch次数
                         if self.ts_list[task.ts_id]['last_task_rs'] > 0:
-                            if self.ts_list[task.ts_id]['last_task_rs'] != action - 1 and self.ts_list[task.ts_id]['last_task_beam'] != beam:
+                            if self.ts_list[task.ts_id]['last_task_rs'] != action - 1:
                                 if_switch = True
 
                         self.ts_list[task.ts_id]['last_task_rs'] = action - 1
-                        self.ts_list[task.ts_id]['last_task_beam'] = beam
+                        # self.ts_list[task.ts_id]['last_task_beam'] = beam
 
                         # For Debug
                         self.debug_rs_list[action - 1][beam].append({
@@ -108,11 +108,14 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         if self.cur_task >= len(self.tasks) - 1:  # last task
             done = True
         if done:
-            return self.state, reward, done, True, {}
+            return np.concatenate([self.state[np.newaxis, :], self.state[np.newaxis, :]], axis=0), reward, done, True,\
+                {'reward': reward, 'is_success': success, 'priority': task.priority}
 
         # 根据下一个task计算下一个state
         next_state = self.get_next_state()
-        return next_state, reward, done, False, {}
+
+        return np.concatenate([self.state[np.newaxis, :], next_state[np.newaxis, :]], axis=0), reward, done, False, \
+            {'reward': reward, 'is_success': success, 'priority': task.priority}
 
     def reset(
             self,
@@ -134,8 +137,9 @@ class SatelliteTaskSchedulingEnv(gym.Env):
             self.debug_rs_list.append([])
             for beam in range(self.config.BEAM_NUM):
                 self.debug_rs_list[i].append([])
+        self.debug_failed_tasks = []
 
-        return next_state, {}
+        return np.concatenate([self.state[np.newaxis, :], next_state[np.newaxis, :]], axis=0), {}
 
     def create_resource_satellites(self):
         satellites = []
@@ -171,6 +175,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
 
     def move_horizon(self, len):
         self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
+        # move less than len
         self.horizon_start += len
 
     def get_next_state(self):
