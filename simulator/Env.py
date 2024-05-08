@@ -43,6 +43,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
 
         # For Debug
         self.debug_rs_list = []
+        self.debug_failed_tasks = []
         self.debug = debug
 
     def step(self, action):
@@ -76,7 +77,11 @@ class SatelliteTaskSchedulingEnv(gym.Env):
                         self.ts_list[task.ts_id]['last_task_beam'] = beam
 
                         # For Debug
-                        self.debug_rs_list[action - 1][beam].append(task)
+                        self.debug_rs_list[action - 1][beam].append({
+                            'ts_id': task.ts_id,
+                            'start_time': j + self.horizon_start,
+                            'duration': task.duration
+                        })
                         break
                 if success:
                     break
@@ -92,8 +97,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
             # 更新reward
             reward = task.priority + 1 - if_switch
         else:  # For Debug
-            if self.debug:
-                print("Task ", task.ts_id, " failed to schedule:", task)
+            self.debug_failed_tasks.append(task)
 
         # 检查是否需要滑动horizon: 这个判断基于 task按照start_time排序
         if self.tasks[self.cur_task].start_time - self.horizon_start + self.tasks[
@@ -187,5 +191,74 @@ class SatelliteTaskSchedulingEnv(gym.Env):
             for beam in range(len(self.debug_rs_list[rs])):
                 print("Beam: ", beam)
                 for task in self.debug_rs_list[rs][beam]:
-                    print("[start:", task.start_time, ", end: ", task.end_time, ", duration: ", task.duration, "]")
+                    print("ts:", task['ts_id'], "[start:", task['start_time'], "duration:", task['duration'], "]")
+
+        # Visualization
+        tasks_data = []
+        for rs in range(len(self.debug_rs_list)):
+            for beam in range(len(self.debug_rs_list[rs])):
+                for task in self.debug_rs_list[rs][beam]:
+                    tasks_data.append({
+                        'rs_id': rs,
+                        'beam': beam,
+                        'ts_id': task['ts_id'],
+                        'start_time': task['start_time'],
+                        'duration': task['duration'],
+                    })
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        # 将数据转换为Pandas DataFrame以便于处理
+        df = pd.DataFrame(tasks_data)
+
+        # 设置画布和轴
+        plt.figure(figsize=(35, 15))
+
+        # 为每个任务绘制一个条形图
+        # 条形图平行于x轴
+        for index, row in df.iterrows():
+            plt.bar(row['start_time'], height=0.5, bottom=row["rs_id"] * self.beam_num + row["beam"], width=row["duration"],
+                    label=f'RS{row["rs_id"]} Beam{row["beam"]} TS{row["ts_id"]}', align='center')
+
+        # 自定义x轴的刻度
+        plt.xlim(df['start_time'].min() - 1, df['start_time'].max() + 1)
+        # plt.xticks(range(df['start_time'].min(), df['start_time'].max() + 1))
+
+        # 添加标签和标题
+        plt.xlabel('Time')
+        plt.ylabel('Resource Satellite')
+        plt.title('Task Scheduling Gantt Chart')
+        plt.legend(loc='right')
+
+        # 保存
+        plt.savefig('task_scheduling_gantt_chart.png')
+        # 显示图表
+        plt.tight_layout()
+        plt.show()
+
+        # draw failed tasks
+        failed_tasks_data = []
+        for task in self.debug_failed_tasks:
+            failed_tasks_data.append({
+                'ts_id': task.ts_id,
+                'priority': task.priority,
+                'start_time': task.start_time,
+                'end_time': task.end_time,
+                'duration': task.duration,
+                'energy': task.energy
+            })
+        df = pd.DataFrame(failed_tasks_data)
+        plt.figure(figsize=(35, 15))
+        for index, row in df.iterrows():
+            plt.bar(row['start_time'], height=0.5, bottom=row["ts_id"], width=row["duration"],
+                    label=f'TS{row["ts_id"]} priority{row["priority"]}', align='center')
+        plt.xlim(df['start_time'].min() - 1, df['start_time'].max() + 1)
+        plt.xlabel('Time')
+        plt.ylabel('Task Satellite')
+        plt.title('Failed Task Scheduling Gantt Chart')
+        # plt.legend()
+        plt.savefig('failed_task_scheduling_gantt_chart.png')
+        plt.tight_layout()
+        plt.show()
+
         pass

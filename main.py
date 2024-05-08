@@ -29,12 +29,12 @@ def evaluate_model(model_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate RL model.")
-    parser.add_argument("--total_timesteps", type=int, default=10000, help="Total number of training timesteps")
+    parser.add_argument("--total_timesteps", type=int, default=80000, help="Total number of training timesteps")
     parser.add_argument("--train", action="store_true", help="Train the model")
     parser.add_argument("--model_path", type=str, default="dqn_satellite_task_scheduling",
                         help="Path to save the trained model")
 
     args = parser.parse_args()
     # if args.train:
-    train_model(args.total_timesteps)
+    # train_model(args.total_timesteps)
     evaluate_model(args.model_path)
