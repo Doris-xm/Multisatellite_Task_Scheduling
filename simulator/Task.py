@@ -39,6 +39,7 @@ def create_tasks(ts_num, max_priority, max_time, max_E, stop_time):
         #             E=random.randint(1, max_E))
         # tasks.append(task)
 
-    # 按照任务开始时间排序
-    tasks.sort(key=lambda x: x.start_time)
+    # 按照任务开始时间排序, 开始时间相同的按照优先级排序
+    tasks.sort(key=lambda x: (x.start_time, -x.priority))
+    # sort priority
     return tasks
