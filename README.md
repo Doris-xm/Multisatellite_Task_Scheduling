@@ -70,3 +70,25 @@ task预先生成，局部贪心：按照开始时间排序，同时开始的按�
 1. task执行时长 ＜ schedule_horizon
 2. 同一个task satellite生成的task可执行窗口不重叠
 3. 不可预定义task数量，但可以通过调整task satellite的数量来增加task数量
+
+### 实验结果
+
+目前调度情况可视化：
+<img src="./task_scheduling_gantt_chart.png">
+
+调度失败的tasks：
+<img src="./failed_task_scheduling_gantt_chart.png">
+
+实验参数：
+
+- 总时长 2000
+- 任务卫星数量 15
+- 资源卫星数量 6*4（beams）
+- 调度窗口 100
+- 滑动步长 40
+
+实验结果：
+- Total step:  969 
+- Average reward:  6.129514963880289 
+- Success rate:  0.9824561403508771 
+- Success priority:  5315 / 5405
