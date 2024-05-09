@@ -15,7 +15,7 @@ class DDQN_agent:
                  exploration_rate=1.0, replacement_frequency=15, learning_rate=1e-4, window_size=20):
 
         self.env = SatelliteTaskSchedulingEnv() # make-vector-env
-        num_envs = 4
+        num_envs = 6
         self.env = make_vec_env(SatelliteTaskSchedulingEnv, n_envs=num_envs)
         # self.env = DummyVecEnv([lambda: self.env])
         self.observation_space = self.env.observation_space
@@ -29,7 +29,7 @@ class DDQN_agent:
         self.window_size = window_size
 
         # Initialize the Behavior Network and the Target Network
-        self.model = DQN(policy="MlpPolicy", env=self.env, verbose=1, tensorboard_log='./log/',
+        self.model = DQN(policy="MlpPolicy", env=self.env, verbose=1, tensorboard_log='./log/',device=torch.device('mps'),
                          learning_rate=learning_rate, buffer_size=10000, gamma=gamma)
 
     def train(self, gradient_steps: int, batch_size: int = 100) -> None:

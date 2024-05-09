@@ -4,14 +4,14 @@ class Config:
     BEAM_NUM = 4
     E_MIN = 40   # minimum energy
     ENERGY_POLICY = 'full'  # how to initialize energy   ['random', 'full']
-    INIT_ENERGY = 200
+    INIT_ENERGY = 4000
 
     # Task Satellites
     TS_NUM = 15
 
     # Tasks
     MAX_PRIORITY = 10
-    MAX_TASK_TIME = 50
+    MAX_TASK_TIME = 40
     MAX_TASK_E = 30
 
     # Time Window

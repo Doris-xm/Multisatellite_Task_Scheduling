@@ -95,14 +95,14 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         reward = -1
         if success:
             # 更新reward
-            reward = task.priority + 1 - if_switch
+            reward = task.priority + 1 - if_switch * 0.5
         else:  # For Debug
             self.debug_failed_tasks.append(task)
 
         # 检查是否需要滑动horizon: 这个判断基于 task按照start_time排序
         if self.tasks[self.cur_task].start_time - self.horizon_start + self.tasks[
             self.cur_task].duration >= self.d_grids:
-            self.move_horizon(self.d_grids)
+            self.move_horizon(self.d_grids * 0.4)
         # 判断是否终止
         done = self.horizon_start >= self.stop_time
         if self.cur_task >= len(self.tasks) - 1:  # last task
@@ -174,7 +174,11 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         pass
 
     def move_horizon(self, len):
-        self.state = np.zeros((self.rs_num, self.beam_num, self.d_grids))
+        # 向左滑动 len 个单位
+        len = int(len)
+        self.state = np.roll(self.state, -len, axis=2)
+        # 将滑动后的最后 len 个单位置零
+        self.state[:, :, -len:] = 0
         # move less than len
         self.horizon_start += len
 
