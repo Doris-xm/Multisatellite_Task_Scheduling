@@ -1,5 +1,8 @@
 # README
 
+论文复现：Event-Triggered Deep Reinforcement Learning for Dynamic Task Scheduling in Multisatellite Resource Allocation
+
+原论文：https://ieeexplore.ieee.org/document/9998480
 ```text
 Multisatellite_Task_Scheduling/
 │
