@@ -1,5 +1,5 @@
 import random
-
+random.seed(0)
 
 class Task:
     def __init__(self, ts_id, priority, start_time, end_time, time, E):

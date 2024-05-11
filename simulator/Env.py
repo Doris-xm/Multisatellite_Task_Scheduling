@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from random import random
+import random
+random.seed(0)
 from typing import Tuple, Dict, Any
 
 import gymnasium as gym
@@ -109,13 +110,13 @@ class SatelliteTaskSchedulingEnv(gym.Env):
             done = True
         if done:
             return np.concatenate([self.state[np.newaxis, :], self.state[np.newaxis, :]], axis=0), reward, done, True,\
-                {'reward': reward, 'is_success': success, 'priority': task.priority}
+                {'reward': reward, 'is_success': success, 'priority': task.priority, 'if_switch': if_switch}
 
         # 根据下一个task计算下一个state
         next_state = self.get_next_state()
 
         return np.concatenate([self.state[np.newaxis, :], next_state[np.newaxis, :]], axis=0), reward, done, False, \
-            {'reward': reward, 'is_success': success, 'priority': task.priority}
+            {'reward': reward, 'is_success': success, 'priority': task.priority, 'if_switch': if_switch}
 
     def reset(
             self,
@@ -152,7 +153,7 @@ class SatelliteTaskSchedulingEnv(gym.Env):
                                       'last_ts': -1})
                 else:  # random
                     satellite.append(
-                        {'E_left': random() % (self.config.INIT_ENERGY - self.config.E_MIN) + self.config.E_MIN,
+                        {'E_left': random.random() % (self.config.INIT_ENERGY - self.config.INIT_ENERGY / 2) + self.config.E_MIN,
                          'E_min': self.config.E_MIN,
                          'last_ts': -1})
             satellites.append(satellite)
@@ -187,11 +188,24 @@ class SatelliteTaskSchedulingEnv(gym.Env):
         task = self.tasks[self.cur_task]
         for i in range(self.rs_num):
             for j in range(self.beam_num):
+                # 检查是否有足够的能量
+                if self.rs_list[i][j]['E_left'] - task.energy < self.min_E:
+                    self.charge_energy(i, j, task.start_time - self.horizon_start)
+                    next_state[i][j][:] = 1
+                    continue
                 # 将不可能的时间段设为1
                 next_state[i][j][0:task.start_time - self.horizon_start] = 1
                 next_state[i][j][task.end_time - self.horizon_start:] = 1
         # next_state 是当前task所有可能执行的时间段
         return next_state
+
+    def charge_energy(self, i, j, start_time_in_horizon):
+        # 充电
+        self.rs_list[i][j]['E_left'] = self.config.INIT_ENERGY
+        # 充电时间设为30
+        charge_time = min(30, self.d_grids - start_time_in_horizon)
+        # 设置不可执行task的时间段
+        self.state[i][j][start_time_in_horizon:start_time_in_horizon + charge_time] = 1
 
     def show_info(self):
         # For Debug
